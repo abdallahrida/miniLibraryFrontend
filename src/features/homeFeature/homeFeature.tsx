@@ -1,213 +1,229 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import axios from 'axios'
-import { Field, Form, Formik, type FormikHelpers } from 'formik'
-import * as Yup from 'yup'
-import { type PaginationState } from '@tanstack/react-table'
-import type { Book, BookFormValues, CheckoutFormValues, BooksResponse } from './homeFeature.types'
+import { useCallback, useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { Field, Form, Formik, type FormikHelpers } from "formik";
+import * as Yup from "yup";
+import { type PaginationState } from "@tanstack/react-table";
+import type {
+  Book,
+  BookFormValues,
+  CheckoutFormValues,
+  BooksResponse,
+} from "./homeFeature.types";
 
-import '../../App.css'
-import { homeFeatureService } from './homeFeature.service'
-import AppButton from '@atoms/appButton/appButton'
-import AppSearchInput from '@atoms/appSearchInput/appSearchInput'
-import BooksTable from '@molecules/booksTable/booksTable'
+import "../../App.css";
+import { homeFeatureService } from "./homeFeature.service";
+import AppButton from "@atoms/appButton/appButton";
+import BooksTable from "@molecules/booksTable/booksTable";
+import Header from "@molecules/header/header";
+import TableToolbar from "@molecules/tableToolbar/tableToolbar";
 
 const defaultBookValues: BookFormValues = {
-  title: '',
-  author: '',
-  isbn: '',
+  title: "",
+  author: "",
+  isbn: "",
   publishedYear: new Date().getFullYear(),
-  genre: '',
-  description: '',
-}
+  genre: "",
+  description: "",
+};
 
 const bookSchema = Yup.object({
-  title: Yup.string().trim().required('Title is required'),
-  author: Yup.string().trim().required('Author is required'),
-  isbn: Yup.string().trim().required('ISBN is required'),
+  title: Yup.string().trim().required("Title is required"),
+  author: Yup.string().trim().required("Author is required"),
+  isbn: Yup.string().trim().required("ISBN is required"),
   publishedYear: Yup.number()
-    .typeError('Published year must be a number')
-    .integer('Published year must be a whole number')
-    .min(0, 'Published year cannot be negative')
-    .max(new Date().getFullYear(), 'Published year cannot be in the future')
-    .required('Published year is required'),
-  genre: Yup.string().trim().required('Genre is required'),
-  description: Yup.string().trim().required('Description is required'),
-})
+    .typeError("Published year must be a number")
+    .integer("Published year must be a whole number")
+    .min(0, "Published year cannot be negative")
+    .max(new Date().getFullYear(), "Published year cannot be in the future")
+    .required("Published year is required"),
+  genre: Yup.string().trim().required("Genre is required"),
+  description: Yup.string().trim().required("Description is required"),
+});
 
 const checkoutSchema = Yup.object({
-  borrowedBy: Yup.string().trim().required('Borrower name is required'),
-})
+  borrowedBy: Yup.string().trim().required("Borrower name is required"),
+});
 
 const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
-    const serverMessage = error.response?.data?.message
-    if (typeof serverMessage === 'string') {
-      return serverMessage
+    const serverMessage = error.response?.data?.message;
+    if (typeof serverMessage === "string") {
+      return serverMessage;
     }
   }
-  return 'Something went wrong. Please try again.'
-}
+  return "Something went wrong. Please try again.";
+};
 
 const isBookCheckedOut = (book: Book): boolean => {
   if (book.status) {
-    return book.status.toLowerCase() !== 'available'
+    return book.status.toLowerCase() !== "available";
   }
-  return Boolean(book.borrowedBy)
-}
+  return Boolean(book.borrowedBy);
+};
 
 export default function HomeFeature() {
-  const [books, setBooks] = useState<Book[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
-  })
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [bookFormMode, setBookFormMode] = useState<'create' | 'edit' | null>(null)
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
-  const [checkoutBook, setCheckoutBook] = useState<Book | null>(null)
-  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'borrowed'>('all')
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  });
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [bookFormMode, setBookFormMode] = useState<"create" | "edit" | null>(
+    null,
+  );
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [checkoutBook, setCheckoutBook] = useState<Book | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "available" | "borrowed"
+  >("all");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current)
+      clearTimeout(searchDebounceRef.current);
     }
     searchDebounceRef.current = setTimeout(() => {
-      const next = searchInput.trim()
-      setSearch(next)
-      setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
-      searchDebounceRef.current = null
-    }, 300)
+      const next = searchInput.trim();
+      setSearch(next);
+      setPagination((prev) =>
+        prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 },
+      );
+      searchDebounceRef.current = null;
+    }, 300);
     return () => {
       if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current)
+        clearTimeout(searchDebounceRef.current);
       }
-    }
-  }, [searchInput])
+    };
+  }, [searchInput]);
 
   const loadBooks = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
     try {
       const response = await homeFeatureService.getBooks({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         ...(search ? { search } : {}),
-        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
-      })
+        ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      });
 
-      const payload: BooksResponse = response.data
-      const serverTotalPages = Math.max(payload.pagination.totalPages, 1)
-      setTotalPages(serverTotalPages)
-      setTotalItems(payload.pagination.totalItems)
-      setBooks(payload.items)
+      const payload: BooksResponse = response.data;
+      const serverTotalPages = Math.max(payload.pagination.totalPages, 1);
+      setTotalPages(serverTotalPages);
+      setTotalItems(payload.pagination.totalItems);
+      setBooks(payload.items);
     } catch (loadError) {
-      setError(getErrorMessage(loadError))
+      setError(getErrorMessage(loadError));
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [pagination.pageIndex, pagination.pageSize, search, statusFilter])
+  }, [pagination.pageIndex, pagination.pageSize, search, statusFilter]);
 
   useEffect(() => {
-    void loadBooks()
-  }, [loadBooks])
+    void loadBooks();
+  }, [loadBooks]);
 
   useEffect(() => {
-    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
-  }, [statusFilter])
+    setPagination((prev) =>
+      prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 },
+    );
+  }, [statusFilter]);
 
   const handleDelete = useCallback(
     async (bookId: string) => {
-      const confirmed = window.confirm('Delete this book? This cannot be undone.')
+      const confirmed = window.confirm(
+        "Delete this book? This cannot be undone.",
+      );
       if (!confirmed) {
-        return
+        return;
       }
 
-      setActionLoadingId(bookId)
-      setError(null)
+      setActionLoadingId(bookId);
+      setError(null);
       try {
-        await homeFeatureService.deleteBook(bookId)
-        await loadBooks()
+        await homeFeatureService.deleteBook(bookId);
+        await loadBooks();
       } catch (deleteError) {
-        setError(getErrorMessage(deleteError))
+        setError(getErrorMessage(deleteError));
       } finally {
-        setActionLoadingId(null)
+        setActionLoadingId(null);
       }
     },
     [loadBooks],
-  )
+  );
 
   const handleCheckIn = useCallback(
     async (bookId: string) => {
-      setActionLoadingId(bookId)
-      setError(null)
+      setActionLoadingId(bookId);
+      setError(null);
       try {
-        await homeFeatureService.checkinBook(bookId)
-        await loadBooks()
+        await homeFeatureService.checkinBook(bookId);
+        await loadBooks();
       } catch (checkinError) {
-        setError(getErrorMessage(checkinError))
+        setError(getErrorMessage(checkinError));
       } finally {
-        setActionLoadingId(null)
+        setActionLoadingId(null);
       }
     },
     [loadBooks],
-  )
+  );
 
   const handleBookSubmit = async (
     values: BookFormValues,
     helpers: FormikHelpers<BookFormValues>,
   ) => {
-    setError(null)
+    setError(null);
     try {
       const payload: BookFormValues = {
         ...values,
         publishedYear: Number(values.publishedYear),
-      }
+      };
 
-      if (bookFormMode === 'edit' && selectedBook) {
-        await homeFeatureService.updateBook(selectedBook._id, payload)
+      if (bookFormMode === "edit" && selectedBook) {
+        await homeFeatureService.updateBook(selectedBook._id, payload);
       } else {
-        await homeFeatureService.createBook(payload)
+        await homeFeatureService.createBook(payload);
       }
-      setBookFormMode(null)
-      setSelectedBook(null)
-      await loadBooks()
+      setBookFormMode(null);
+      setSelectedBook(null);
+      await loadBooks();
     } catch (submitError) {
-      helpers.setStatus(getErrorMessage(submitError))
+      helpers.setStatus(getErrorMessage(submitError));
     } finally {
-      helpers.setSubmitting(false)
+      helpers.setSubmitting(false);
     }
-  }
+  };
 
   const handleCheckoutSubmit = async (
     values: CheckoutFormValues,
     helpers: FormikHelpers<CheckoutFormValues>,
   ) => {
     if (!checkoutBook) {
-      helpers.setSubmitting(false)
-      return
+      helpers.setSubmitting(false);
+      return;
     }
 
-    setError(null)
+    setError(null);
     try {
-      await homeFeatureService.checkoutBook(checkoutBook._id, values)
-      setCheckoutBook(null)
-      await loadBooks()
+      await homeFeatureService.checkoutBook(checkoutBook._id, values);
+      setCheckoutBook(null);
+      await loadBooks();
     } catch (submitError) {
-      helpers.setStatus(getErrorMessage(submitError))
+      helpers.setStatus(getErrorMessage(submitError));
     } finally {
-      helpers.setSubmitting(false)
+      helpers.setSubmitting(false);
     }
-  }
+  };
 
   const formInitialValues: BookFormValues =
-    bookFormMode === 'edit' && selectedBook
+    bookFormMode === "edit" && selectedBook
       ? {
           title: selectedBook.title,
           author: selectedBook.author,
@@ -216,51 +232,26 @@ export default function HomeFeature() {
           genre: selectedBook.genre,
           description: selectedBook.description,
         }
-      : defaultBookValues
+      : defaultBookValues;
 
   return (
     <main className="page">
-      <div className="page-header">
-        <div>
-          <h1>Mini Library Management System</h1>
-          <p>Manage books, borrowing, and returns.</p>
-        </div>
-        <AppButton
-          type="button"
-          variant="primary"
-          onClick={() => {
-            setSelectedBook(null)
-            setBookFormMode('create')
-          }}
-        >
-          Create
-        </AppButton>
-      </div>
+      <Header
+        onCreate={() => {
+          setSelectedBook(null);
+          setBookFormMode("create");
+        }}
+      />
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="table-toolbar">
-        <AppSearchInput
-          value={searchInput}
-          onChange={setSearchInput}
-          placeholder="Search by title, author, ISBN, genre, description, borrower…"
-        />
-        <label className="table-toolbar__status">
-          Status
-          <select
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as 'all' | 'available' | 'borrowed')
-            }
-            disabled={loading}
-            aria-label="Filter by status"
-          >
-            <option value="all">All</option>
-            <option value="available">Available</option>
-            <option value="borrowed">Borrowed</option>
-          </select>
-        </label>
-      </div>
+      <TableToolbar
+        loading={loading}
+        searchInput={searchInput}
+        setSearchInput={setSearchInput}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+      />
 
       <BooksTable
         books={books}
@@ -271,17 +262,17 @@ export default function HomeFeature() {
         totalItems={totalItems}
         onPaginationChange={setPagination}
         onEdit={(book) => {
-          setSelectedBook(book)
-          setBookFormMode('edit')
+          setSelectedBook(book);
+          setBookFormMode("edit");
         }}
         onDelete={(bookId) => {
-          void handleDelete(bookId)
+          void handleDelete(bookId);
         }}
         onCheckIn={(bookId) => {
-          void handleCheckIn(bookId)
+          void handleCheckIn(bookId);
         }}
         onCheckOut={(book) => {
-          setCheckoutBook(book)
+          setCheckoutBook(book);
         }}
         isBookCheckedOut={isBookCheckedOut}
       />
@@ -289,7 +280,7 @@ export default function HomeFeature() {
       {bookFormMode ? (
         <div className="modal-backdrop">
           <div className="modal">
-            <h2>{bookFormMode === 'create' ? 'Create Book' : 'Edit Book'}</h2>
+            <h2>{bookFormMode === "create" ? "Create Book" : "Edit Book"}</h2>
             <Formik
               initialValues={formInitialValues}
               validationSchema={bookSchema}
@@ -323,7 +314,9 @@ export default function HomeFeature() {
                     Published Year
                     <Field name="publishedYear" type="number" />
                     {touched.publishedYear && errors.publishedYear ? (
-                      <span className="field-error">{errors.publishedYear}</span>
+                      <span className="field-error">
+                        {errors.publishedYear}
+                      </span>
                     ) : null}
                   </label>
                   <label>
@@ -346,8 +339,8 @@ export default function HomeFeature() {
                       type="button"
                       variant="secondary"
                       onClick={() => {
-                        setBookFormMode(null)
-                        setSelectedBook(null)
+                        setBookFormMode(null);
+                        setSelectedBook(null);
                       }}
                       disabled={isSubmitting}
                     >
@@ -358,7 +351,7 @@ export default function HomeFeature() {
                       variant="primary"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Saving...' : 'Save'}
+                      {isSubmitting ? "Saving..." : "Save"}
                     </AppButton>
                   </div>
                 </Form>
@@ -376,7 +369,7 @@ export default function HomeFeature() {
               <strong>{checkoutBook.title}</strong>
             </p>
             <Formik
-              initialValues={{ borrowedBy: '' }}
+              initialValues={{ borrowedBy: "" }}
               validationSchema={checkoutSchema}
               onSubmit={handleCheckoutSubmit}
             >
@@ -404,7 +397,7 @@ export default function HomeFeature() {
                       variant="primary"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? 'Checking out...' : 'Confirm'}
+                      {isSubmitting ? "Checking out..." : "Confirm"}
                     </AppButton>
                   </div>
                 </Form>
@@ -414,5 +407,5 @@ export default function HomeFeature() {
         </div>
       ) : null}
     </main>
-  )
+  );
 }
