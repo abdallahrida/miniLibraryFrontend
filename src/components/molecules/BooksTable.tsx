@@ -6,9 +6,9 @@ import {
   type ColumnDef,
   type PaginationState,
 } from '@tanstack/react-table'
-import type { Book } from '../../homeFeature.types'
 import AppButton from '../atoms/AppButton'
 import './BooksTable.css'
+import type { Book } from '../../features/homeFeature/homeFeature.types'
 
 type BooksTableProps = {
   books: Book[]
