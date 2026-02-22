@@ -1,0 +1,366 @@
+import { useCallback, useEffect, useState } from 'react'
+import axios from 'axios'
+import { Field, Form, Formik, type FormikHelpers } from 'formik'
+import * as Yup from 'yup'
+import { type PaginationState } from '@tanstack/react-table'
+import '../../App.css'
+import { homeFeatureService } from './homeFeature.service'
+import type { Book, BookFormValues, CheckoutFormValues, BooksResponse } from './homeFeature.types'
+import AppButton from '../../components/atoms/AppButton'
+import BooksTable from '../../components/molecules/BooksTable'
+
+const defaultBookValues: BookFormValues = {
+  title: '',
+  author: '',
+  isbn: '',
+  publishedYear: new Date().getFullYear(),
+  genre: '',
+  description: '',
+}
+
+const bookSchema = Yup.object({
+  title: Yup.string().trim().required('Title is required'),
+  author: Yup.string().trim().required('Author is required'),
+  isbn: Yup.string().trim().required('ISBN is required'),
+  publishedYear: Yup.number()
+    .typeError('Published year must be a number')
+    .integer('Published year must be a whole number')
+    .min(0, 'Published year cannot be negative')
+    .max(new Date().getFullYear(), 'Published year cannot be in the future')
+    .required('Published year is required'),
+  genre: Yup.string().trim().required('Genre is required'),
+  description: Yup.string().trim().required('Description is required'),
+})
+
+const checkoutSchema = Yup.object({
+  borrowedBy: Yup.string().trim().required('Borrower name is required'),
+})
+
+const getErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const serverMessage = error.response?.data?.message
+    if (typeof serverMessage === 'string') {
+      return serverMessage
+    }
+  }
+  return 'Something went wrong. Please try again.'
+}
+
+const isBookCheckedOut = (book: Book): boolean => {
+  if (book.status) {
+    return book.status.toLowerCase() !== 'available'
+  }
+  return Boolean(book.borrowedBy)
+}
+
+export default function HomeFeature() {
+  const [books, setBooks] = useState<Book[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  })
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [bookFormMode, setBookFormMode] = useState<'create' | 'edit' | null>(null)
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+  const [checkoutBook, setCheckoutBook] = useState<Book | null>(null)
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+
+  const loadBooks = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await homeFeatureService.getBooks({
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+      })
+
+      const payload: BooksResponse = response.data
+      const serverTotalPages = Math.max(payload.pagination.totalPages, 1)
+      setTotalPages(serverTotalPages)
+      setTotalItems(payload.pagination.totalItems)
+      setBooks(payload.items)
+    } catch (loadError) {
+      setError(getErrorMessage(loadError))
+    } finally {
+      setLoading(false)
+    }
+  }, [pagination.pageIndex, pagination.pageSize])
+
+  useEffect(() => {
+    void loadBooks()
+  }, [loadBooks])
+
+  const handleDelete = useCallback(
+    async (bookId: string) => {
+      const confirmed = window.confirm('Delete this book? This cannot be undone.')
+      if (!confirmed) {
+        return
+      }
+
+      setActionLoadingId(bookId)
+      setError(null)
+      try {
+        await homeFeatureService.deleteBook(bookId)
+        await loadBooks()
+      } catch (deleteError) {
+        setError(getErrorMessage(deleteError))
+      } finally {
+        setActionLoadingId(null)
+      }
+    },
+    [loadBooks],
+  )
+
+  const handleCheckIn = useCallback(
+    async (bookId: string) => {
+      setActionLoadingId(bookId)
+      setError(null)
+      try {
+        await homeFeatureService.checkinBook(bookId)
+        await loadBooks()
+      } catch (checkinError) {
+        setError(getErrorMessage(checkinError))
+      } finally {
+        setActionLoadingId(null)
+      }
+    },
+    [loadBooks],
+  )
+
+  const handleBookSubmit = async (
+    values: BookFormValues,
+    helpers: FormikHelpers<BookFormValues>,
+  ) => {
+    setError(null)
+    try {
+      const payload: BookFormValues = {
+        ...values,
+        publishedYear: Number(values.publishedYear),
+      }
+
+      if (bookFormMode === 'edit' && selectedBook) {
+        await homeFeatureService.updateBook(selectedBook._id, payload)
+      } else {
+        await homeFeatureService.createBook(payload)
+      }
+      setBookFormMode(null)
+      setSelectedBook(null)
+      await loadBooks()
+    } catch (submitError) {
+      helpers.setStatus(getErrorMessage(submitError))
+    } finally {
+      helpers.setSubmitting(false)
+    }
+  }
+
+  const handleCheckoutSubmit = async (
+    values: CheckoutFormValues,
+    helpers: FormikHelpers<CheckoutFormValues>,
+  ) => {
+    if (!checkoutBook) {
+      helpers.setSubmitting(false)
+      return
+    }
+
+    setError(null)
+    try {
+      await homeFeatureService.checkoutBook(checkoutBook._id, values)
+      setCheckoutBook(null)
+      await loadBooks()
+    } catch (submitError) {
+      helpers.setStatus(getErrorMessage(submitError))
+    } finally {
+      helpers.setSubmitting(false)
+    }
+  }
+
+  const formInitialValues: BookFormValues =
+    bookFormMode === 'edit' && selectedBook
+      ? {
+          title: selectedBook.title,
+          author: selectedBook.author,
+          isbn: selectedBook.isbn,
+          publishedYear: selectedBook.publishedYear,
+          genre: selectedBook.genre,
+          description: selectedBook.description,
+        }
+      : defaultBookValues
+
+  return (
+    <main className="page">
+      <div className="page-header">
+        <div>
+          <h1>Mini Library Management System</h1>
+          <p>Manage books, borrowing, and returns.</p>
+        </div>
+        <AppButton
+          type="button"
+          variant="primary"
+          onClick={() => {
+            setSelectedBook(null)
+            setBookFormMode('create')
+          }}
+        >
+          Create
+        </AppButton>
+      </div>
+
+      {error ? <div className="error-banner">{error}</div> : null}
+
+      <BooksTable
+        books={books}
+        loading={loading}
+        actionLoadingId={actionLoadingId}
+        pagination={pagination}
+        totalPages={totalPages}
+        totalItems={totalItems}
+        onPaginationChange={setPagination}
+        onEdit={(book) => {
+          setSelectedBook(book)
+          setBookFormMode('edit')
+        }}
+        onDelete={(bookId) => {
+          void handleDelete(bookId)
+        }}
+        onCheckIn={(bookId) => {
+          void handleCheckIn(bookId)
+        }}
+        onCheckOut={(book) => {
+          setCheckoutBook(book)
+        }}
+        isBookCheckedOut={isBookCheckedOut}
+      />
+
+      {bookFormMode ? (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2>{bookFormMode === 'create' ? 'Create Book' : 'Edit Book'}</h2>
+            <Formik
+              initialValues={formInitialValues}
+              validationSchema={bookSchema}
+              onSubmit={handleBookSubmit}
+              enableReinitialize
+            >
+              {({ errors, touched, isSubmitting, status }) => (
+                <Form className="form-grid">
+                  <label>
+                    Title
+                    <Field name="title" />
+                    {touched.title && errors.title ? (
+                      <span className="field-error">{errors.title}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Author
+                    <Field name="author" />
+                    {touched.author && errors.author ? (
+                      <span className="field-error">{errors.author}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    ISBN
+                    <Field name="isbn" />
+                    {touched.isbn && errors.isbn ? (
+                      <span className="field-error">{errors.isbn}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Published Year
+                    <Field name="publishedYear" type="number" />
+                    {touched.publishedYear && errors.publishedYear ? (
+                      <span className="field-error">{errors.publishedYear}</span>
+                    ) : null}
+                  </label>
+                  <label>
+                    Genre
+                    <Field name="genre" />
+                    {touched.genre && errors.genre ? (
+                      <span className="field-error">{errors.genre}</span>
+                    ) : null}
+                  </label>
+                  <label className="full-width">
+                    Description
+                    <Field name="description" as="textarea" rows={4} />
+                    {touched.description && errors.description ? (
+                      <span className="field-error">{errors.description}</span>
+                    ) : null}
+                  </label>
+                  {status ? <p className="form-error">{status}</p> : null}
+                  <div className="modal-actions">
+                    <AppButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setBookFormMode(null)
+                        setSelectedBook(null)
+                      }}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </AppButton>
+                    <AppButton
+                      type="submit"
+                      variant="primary"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Saving...' : 'Save'}
+                    </AppButton>
+                  </div>
+                </Form>
+              )}
+            </Formik>
+          </div>
+        </div>
+      ) : null}
+
+      {checkoutBook ? (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2>Check Out Book</h2>
+            <p>
+              <strong>{checkoutBook.title}</strong>
+            </p>
+            <Formik
+              initialValues={{ borrowedBy: '' }}
+              validationSchema={checkoutSchema}
+              onSubmit={handleCheckoutSubmit}
+            >
+              {({ errors, touched, isSubmitting, status }) => (
+                <Form className="form-grid">
+                  <label>
+                    Borrowed By
+                    <Field name="borrowedBy" placeholder="Borrower full name" />
+                    {touched.borrowedBy && errors.borrowedBy ? (
+                      <span className="field-error">{errors.borrowedBy}</span>
+                    ) : null}
+                  </label>
+                  {status ? <p className="form-error">{status}</p> : null}
+                  <div className="modal-actions">
+                    <AppButton
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setCheckoutBook(null)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </AppButton>
+                    <AppButton
+                      type="submit"
+                      variant="primary"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Checking out...' : 'Confirm'}
+                    </AppButton>
+                  </div>
+                </Form>
+              )}
+            </Formik>
+          </div>
+        </div>
+      ) : null}
+    </main>
+  )
+}

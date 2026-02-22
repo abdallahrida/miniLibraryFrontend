@@ -1,0 +1,32 @@
+.app-button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.app-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.app-button--primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.app-button--secondary {
+  background: #e5e7eb;
+  color: #1f2937;
+}
+
+.app-button--success {
+  background: #15803d;
+  color: #ffffff;
+}
+
+.app-button--danger {
+  background: #dc2626;
+  color: #ffffff;
+}
