@@ -2,8 +2,8 @@ import { Field, Form, useFormikContext } from "formik";
 
 import { AppButton } from "@atoms";
 import type { BookFormValues } from "@features/homeFeature/homeFeature.types";
-import { formClasses } from "./form.styling";
-import "./form.css";
+import { formClasses } from "./bookform.styling";
+import "./bookform.css";
 
 export type BookFormProps = {
   onCancel: () => void;
