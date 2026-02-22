@@ -3,11 +3,12 @@ import axios from 'axios'
 import { Field, Form, Formik, type FormikHelpers } from 'formik'
 import * as Yup from 'yup'
 import { type PaginationState } from '@tanstack/react-table'
+import type { Book, BookFormValues, CheckoutFormValues, BooksResponse } from './homeFeature.types'
+
 import '../../App.css'
 import { homeFeatureService } from './homeFeature.service'
-import type { Book, BookFormValues, CheckoutFormValues, BooksResponse } from './homeFeature.types'
-import AppButton from '../../components/atoms/AppButton'
-import BooksTable from '../../components/molecules/BooksTable'
+import AppButton from '@atoms/AppButton'
+import BooksTable from '@molecules/BooksTable'
 
 const defaultBookValues: BookFormValues = {
   title: '',
