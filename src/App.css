@@ -34,6 +34,30 @@
   color: #6b1111;
 }
 
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.table-toolbar__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.table-toolbar__status select {
+  border-radius: 8px;
+  border: 1px solid #cfd4dc;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  min-width: 120px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

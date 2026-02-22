@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { Field, Form, Formik, type FormikHelpers } from 'formik'
 import * as Yup from 'yup'
@@ -7,8 +7,9 @@ import type { Book, BookFormValues, CheckoutFormValues, BooksResponse } from './
 
 import '../../App.css'
 import { homeFeatureService } from './homeFeature.service'
-import AppButton from '@atoms/AppButton'
-import BooksTable from '@molecules/BooksTable'
+import AppButton from '@atoms/appButton/appButton'
+import AppSearchInput from '@atoms/appSearchInput/appSearchInput'
+import BooksTable from '@molecules/booksTable/booksTable'
 
 const defaultBookValues: BookFormValues = {
   title: '',
@@ -68,6 +69,27 @@ export default function HomeFeature() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
   const [checkoutBook, setCheckoutBook] = useState<Book | null>(null)
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'borrowed'>('all')
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current)
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      const next = searchInput.trim()
+      setSearch(next)
+      setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
+      searchDebounceRef.current = null
+    }, 300)
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [searchInput])
 
   const loadBooks = useCallback(async () => {
     setLoading(true)
@@ -76,6 +98,8 @@ export default function HomeFeature() {
       const response = await homeFeatureService.getBooks({
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
+        ...(search ? { search } : {}),
+        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       })
 
       const payload: BooksResponse = response.data
@@ -88,11 +112,15 @@ export default function HomeFeature() {
     } finally {
       setLoading(false)
     }
-  }, [pagination.pageIndex, pagination.pageSize])
+  }, [pagination.pageIndex, pagination.pageSize, search, statusFilter])
 
   useEffect(() => {
     void loadBooks()
   }, [loadBooks])
+
+  useEffect(() => {
+    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
+  }, [statusFilter])
 
   const handleDelete = useCallback(
     async (bookId: string) => {
@@ -210,6 +238,29 @@ export default function HomeFeature() {
       </div>
 
       {error ? <div className="error-banner">{error}</div> : null}
+
+      <div className="table-toolbar">
+        <AppSearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search by title, author, ISBN, genre, description, borrower…"
+        />
+        <label className="table-toolbar__status">
+          Status
+          <select
+            value={statusFilter}
+            onChange={(e) =>
+              setStatusFilter(e.target.value as 'all' | 'available' | 'borrowed')
+            }
+            disabled={loading}
+            aria-label="Filter by status"
+          >
+            <option value="all">All</option>
+            <option value="available">Available</option>
+            <option value="borrowed">Borrowed</option>
+          </select>
+        </label>
+      </div>
 
       <BooksTable
         books={books}

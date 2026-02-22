@@ -26,6 +26,7 @@ export type CheckoutFormValues = {
 export type BooksQueryParams = {
   page: number
   limit: number
+  search?: string
   title?: string
   author?: string
   isbn?: string
