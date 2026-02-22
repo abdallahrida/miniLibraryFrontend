@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes } from 'react'
+
 import './appSearchInput.css'
 
 type AppSearchInputProps = {

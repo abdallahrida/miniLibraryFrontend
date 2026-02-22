@@ -10,13 +10,15 @@ import type {
   CheckoutFormValues,
   BooksResponse,
 } from "./homeFeature.types";
-import "../../App.css";
+import "@/App.css";
 import { homeFeatureService } from "./homeFeature.service";
-import { BookForm } from "@molecules/form";
-import { CheckoutBookForm } from "@molecules/checkoutBookForm";
-import BooksTable from "@molecules/booksTable/booksTable";
-import Header from "@molecules/header/header";
-import TableToolbar from "@molecules/tableToolbar/tableToolbar";
+import {
+  BookForm,
+  CheckoutBookForm,
+  BooksTable,
+  Header,
+  TableToolbar,
+} from "@molecules";
 
 const defaultBookValues: BookFormValues = {
   title: "",

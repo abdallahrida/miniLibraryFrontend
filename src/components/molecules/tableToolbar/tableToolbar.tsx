@@ -1,4 +1,4 @@
-import AppSearchInput from "@atoms/appSearchInput/appSearchInput";
+import { AppSearchInput } from "@atoms";
 import "./tableToolbar.css";
 
 interface TableToolbarProps {

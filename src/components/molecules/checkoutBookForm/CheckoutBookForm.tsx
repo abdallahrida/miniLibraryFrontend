@@ -2,8 +2,8 @@ import { Field, Form, Formik, type FormikHelpers } from "formik";
 import type { ObjectSchema } from "yup";
 
 import type { Book, CheckoutFormValues } from "@features/homeFeature/homeFeature.types";
-import { formClasses } from "@molecules/form";
-import AppButton from "@atoms/appButton/appButton";
+import { formClasses } from "../form/form.styling";
+import { AppButton } from "@atoms";
 
 export type CheckoutBookFormProps = {
   book: Book;

@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+
 import './appButton.css'
 
 type AppButtonVariant = 'primary' | 'secondary' | 'success' | 'danger'

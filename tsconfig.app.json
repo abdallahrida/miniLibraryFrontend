@@ -10,7 +10,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@atoms": ["./src/components/atoms/index.ts"],
       "@atoms/*": ["./src/components/atoms/*"],
+      "@molecules": ["./src/components/molecules/index.ts"],
       "@molecules/*": ["./src/components/molecules/*"],
       "@features/*": ["./src/features/*"]
     },

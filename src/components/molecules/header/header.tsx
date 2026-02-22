@@ -1,5 +1,4 @@
-import AppButton from "@atoms/appButton/appButton";
-
+import { AppButton } from "@atoms";
 import "./header.css"
 
 interface HeaderProps {
